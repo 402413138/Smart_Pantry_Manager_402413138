@@ -7,15 +7,26 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 import java.util.*;
 
+/**
+ * SQLite Database Helper class managing pantry items and pre-populated recipes.
+ * Handles database creation, initial recipe seeding, unit conversions, string normalizations,
+ * and recipe matching logic (Strict and Almost-There matches).
+ */
 public class DatabaseHelper extends SQLiteOpenHelper {
     private static final String DB_NAME = "smart_pantry.db";
     private static final int DB_VERSION = 2;
 
-    public DatabaseHelper(Context context) { super(context, DB_NAME, null, DB_VERSION); }
+    public DatabaseHelper(Context context) { 
+        super(context, DB_NAME, null, DB_VERSION); 
+    }
 
-    @Override public void onCreate(SQLiteDatabase db) {
+    @Override 
+    public void onCreate(SQLiteDatabase db) {
+        // Create pantry and recipes tables
         db.execSQL("CREATE TABLE pantry (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, quantity REAL NOT NULL, unit TEXT NOT NULL, expiry TEXT)");
         db.execSQL("CREATE TABLE recipes (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, ingredients_json TEXT NOT NULL, method TEXT NOT NULL)");
+        
+        // Seed database with initial recipe dataset
         seedRecipes(db);
     }
 
@@ -26,6 +37,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         }
     }
 
+    /**
+     * Seeds initial 20 recipes into the database during creation or upgrade.
+     */
     private void seedRecipes(SQLiteDatabase db) {
         String[][] data = {
                 {"Tomato Egg Scramble","tomato|1|piece;egg|2|piece;oil|5|ml","1. Chop the tomato. 2. Heat oil in a pan. 3. Add tomato and beaten eggs; cook until set."},
@@ -49,61 +63,85 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 {"Mushroom Cheese Pasta","pasta|100|g;mushroom|100|g;cheese|30|g;milk|50|ml","1. Cook pasta. 2. Sauté mushrooms. 3. Add milk and cheese. 4. Toss with pasta."},
                 {"Oats Banana Cookies","oats|100|g;banana|2|piece;peanut butter|20|g","1. Mash bananas. 2. Mix with oats and peanut butter. 3. Shape cookies and bake at 180°C for 12–15 minutes."}
         };
+
         for (String[] r : data) {
             JSONArray arr = new JSONArray();
             for (String part : r[1].split(";")) {
                 String[] p = part.split("\\|");
                 JSONObject o = new JSONObject();
-                try { o.put("name", p[0]); o.put("quantity", Double.parseDouble(p[1])); o.put("unit", p[2]); arr.put(o); }
-                catch (Exception ignored) {}
+                try { 
+                    o.put("name", p[0]); 
+                    o.put("quantity", Double.parseDouble(p[1])); 
+                    o.put("unit", p[2]); 
+                    arr.put(o); 
+                } catch (Exception ignored) {}
             }
             ContentValues cv = new ContentValues();
             cv.put("name", r[0]);
             cv.put("ingredients_json", arr.toString());
             cv.put("method", r[2]);
 
-            int updated = db.update(
-                    "recipes",
-                    cv,
-                    "name = ?",
-                    new String[]{r[0]}
-            );
-
+            int updated = db.update("recipes", cv, "name = ?", new String[]{r[0]});
             if (updated == 0) {
                 db.insert("recipes", null, cv);
             }
         }
     }
 
+    /**
+     * Inserts a new pantry item or updates an existing item in SQLite.
+     *
+     * @param item The pantry item to insert/update
+     * @return Item ID or -1 on failure
+     */
     public long savePantryItem(PantryItem item) {
         SQLiteDatabase db = getWritableDatabase();
         ContentValues cv = new ContentValues();
-        cv.put("name", normalizeName(item.name)); cv.put("quantity", item.quantity);
-        cv.put("unit", normalizeUnit(item.unit)); cv.put("expiry", item.expiry);
+        cv.put("name", normalizeName(item.name));
+        cv.put("quantity", item.quantity);
+        cv.put("unit", normalizeUnit(item.unit));
+        cv.put("expiry", item.expiry);
+
         if (item.id == 0) return db.insert("pantry", null, cv);
         return db.update("pantry", cv, "id=?", new String[]{String.valueOf(item.id)}) > 0 ? item.id : -1;
     }
 
+    /**
+     * Deletes a pantry item by its unique ID.
+     */
     public boolean deletePantryItem(long id) {
         return getWritableDatabase().delete("pantry", "id=?", new String[]{String.valueOf(id)}) > 0;
     }
 
+    /**
+     * Retrieves all pantry items ordered alphabetically by name.
+     */
     public List<PantryItem> getPantryItems() {
         List<PantryItem> items = new ArrayList<>();
         try (Cursor c = getReadableDatabase().rawQuery("SELECT id,name,quantity,unit,expiry FROM pantry ORDER BY name", null)) {
-            while (c.moveToNext()) items.add(new PantryItem(c.getLong(0), c.getString(1), c.getDouble(2), c.getString(3), c.getString(4)));
+            while (c.moveToNext()) {
+                items.add(new PantryItem(c.getLong(0), c.getString(1), c.getDouble(2), c.getString(3), c.getString(4)));
+            }
         }
         return items;
     }
 
+    /**
+     * Retrieves all recipes stored in the database.
+     */
     public List<Recipe> getRecipes() {
         List<Recipe> recipes = new ArrayList<>();
         try (Cursor c = getReadableDatabase().rawQuery("SELECT id,name,ingredients_json,method FROM recipes ORDER BY name", null)) {
-            while (c.moveToNext()) recipes.add(new Recipe(c.getLong(0), c.getString(1), c.getString(2), c.getString(3)));
+            while (c.moveToNext()) {
+                recipes.add(new Recipe(c.getLong(0), c.getString(1), c.getString(2), c.getString(3)));
+            }
         }
         return recipes;
     }
 
+    /**
+     * Returns recipes where ALL required ingredients are fully satisfied by available pantry quantities.
+     */
     public List<Recipe> getStrictMatches() {
         List<PantryItem> pantry = getPantryItems();
         List<Recipe> matches = new ArrayList<>();
@@ -113,27 +151,26 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         return matches;
     }
 
-
+    /**
+     * Returns recipes that are missing EXACTLY ONE required ingredient requirement in the pantry.
+     */
     public List<Recipe> getAlmostThereMatches() {
         List<PantryItem> pantry = getPantryItems();
         List<Recipe> almostThere = new ArrayList<>();
 
         for (Recipe recipe : getRecipes()) {
-
-            // Recipes that can already be made belong only in strict matches.
+            // Recipes that can already be made belong only in strict matches
             if (canMake(recipe, pantry)) {
                 continue;
             }
 
             try {
                 JSONArray required = new JSONArray(recipe.ingredientsJson);
-
                 int unmetCount = 0;
                 String missingMessage = "";
 
                 for (int i = 0; i < required.length(); i++) {
                     JSONObject need = required.getJSONObject(i);
-
                     String wantedName = need.getString("name");
                     String wantedUnit = need.getString("unit");
                     double wantedQty = need.getDouble("quantity");
@@ -142,70 +179,70 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
                     if (available + 0.000001 < wantedQty) {
                         unmetCount++;
-
                         double shortage = Math.max(0, wantedQty - available);
 
                         if (available <= 0.000001) {
-                            missingMessage = "Missing: "
-                                    + need.getString("name")
-                                    + " (" + formatQuantity(wantedQty)
-                                    + " " + normalizeUnit(wantedUnit) + " needed)";
+                            missingMessage = "Missing: " + need.getString("name") +
+                                    " (" + formatQuantity(wantedQty) + " " + normalizeUnit(wantedUnit) + " needed)";
                         } else {
-                            missingMessage = "Insufficient quantity: "
-                                    + need.getString("name")
-                                    + " (need " + formatQuantity(shortage)
-                                    + " " + normalizeUnit(wantedUnit) + " more)";
+                            missingMessage = "Insufficient quantity: " + need.getString("name") +
+                                    " (need " + formatQuantity(shortage) + " " + normalizeUnit(wantedUnit) + " more)";
                         }
 
-                        // More than one unmet requirement disqualifies
-                        // the recipe from the Almost There section.
+                        // More than one unmet requirement disqualifies the recipe from Almost-There section
                         if (unmetCount > 1) {
                             break;
                         }
                     }
                 }
 
-                // Bonus requirement: exactly one unmet ingredient requirement.
+                // Exactly one unmet requirement matches Almost-There criteria
                 if (unmetCount == 1) {
-                    recipe.almostThereMessage =
-                            "Almost there! " + missingMessage;
-
+                    recipe.almostThereMessage = "Almost there! " + missingMessage;
                     almostThere.add(recipe);
                 }
-
-            } catch (Exception ignored) {
-                // Ignore recipes whose ingredient data cannot be parsed.
-            }
+            } catch (Exception ignored) {}
         }
 
         return almostThere;
     }
 
+    /**
+     * Formats numerical quantity cleanly without trailing zero decimals.
+     */
     private String formatQuantity(double quantity) {
         if (Math.abs(quantity - Math.rint(quantity)) < 0.000001) {
             return String.format(Locale.US, "%.0f", quantity);
         }
-
         return String.format(Locale.US, "%.4f", quantity)
                 .replaceAll("0+$", "")
                 .replaceAll("\\.$", "");
     }
 
+    /**
+     * Checks if all required ingredients for a recipe are available in the pantry in sufficient amounts.
+     */
     private boolean canMake(Recipe recipe, List<PantryItem> pantry) {
         try {
             JSONArray required = new JSONArray(recipe.ingredientsJson);
-            for (int i=0; i<required.length(); i++) {
+            for (int i = 0; i < required.length(); i++) {
                 JSONObject need = required.getJSONObject(i);
                 String wantedName = need.getString("name");
                 String wantedUnit = need.getString("unit");
                 double wantedQty = need.getDouble("quantity");
+
                 double available = getAvailableQuantity(pantry, wantedName, wantedUnit);
                 if (available + 0.000001 < wantedQty) return false;
             }
             return required.length() > 0;
-        } catch (Exception e) { return false; }
+        } catch (Exception e) {
+            return false;
+        }
     }
 
+    /**
+     * Calculates total available quantity of an ingredient in the pantry, converting compatible units if needed.
+     */
     private double getAvailableQuantity(List<PantryItem> pantry, String wantedName, String wantedUnit) {
         double total = 0;
         String normWantedName = normalizeName(wantedName);
@@ -224,6 +261,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         return total;
     }
 
+    /**
+     * Converts a quantity between two units if compatible (e.g. grams to kilograms, ml to liters).
+     */
     public static double getConvertedQuantity(double qty, String fromUnit, String toUnit) {
         String from = normalizeUnit(fromUnit);
         String to = normalizeUnit(toUnit);
@@ -244,6 +284,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         return 0;
     }
 
+    /**
+     * Converts a weight measurement unit to grams.
+     */
     private static Double toGrams(double qty, String unit) {
         switch (unit) {
             case "g": return qty;
@@ -254,6 +297,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         }
     }
 
+    /**
+     * Converts a volume measurement unit to milliliters.
+     */
     private static Double toMl(double qty, String unit) {
         switch (unit) {
             case "ml": return qty;
@@ -266,16 +312,22 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         }
     }
 
+    /**
+     * Normalizes ingredient names for reliable comparison (trims, converts to lowercase, handles plurals).
+     */
     public static String normalizeName(String name) {
         String n = name == null ? "" : name.trim().toLowerCase(Locale.ROOT);
-        if (n.endsWith("ies") && n.length() > 4) n = n.substring(0,n.length()-3)+"y";
-        else if (n.endsWith("oes") && n.length() > 4) n = n.substring(0,n.length()-2);
-        else if (n.endsWith("s") && !n.endsWith("ss") && n.length() > 3) n = n.substring(0,n.length()-1);
+        if (n.endsWith("ies") && n.length() > 4) n = n.substring(0, n.length() - 3) + "y";
+        else if (n.endsWith("oes") && n.length() > 4) n = n.substring(0, n.length() - 2);
+        else if (n.endsWith("s") && !n.endsWith("ss") && n.length() > 3) n = n.substring(0, n.length() - 1);
         if (n.equals("tomatoe")) n = "tomato";
         if (n.equals("mushrooms")) n = "mushroom";
         return n;
     }
 
+    /**
+     * Normalizes unit strings (e.g. "pcs", "pieces" -> "piece"; "grams" -> "g").
+     */
     public static String normalizeUnit(String unit) {
         String u = unit == null ? "" : unit.trim().toLowerCase(Locale.ROOT);
         if (u.equals("pcs") || u.equals("pieces") || u.equals("pc")) return "piece";
@@ -293,4 +345,3 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         return u;
     }
 }
-

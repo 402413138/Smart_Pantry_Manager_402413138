@@ -16,8 +16,20 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
+/**
+ * RecyclerView Adapter for displaying pantry ingredients, expiry status badges,
+ * and edit/delete action triggers.
+ */
 public class PantryAdapter extends RecyclerView.Adapter<PantryAdapter.Holder> {
-    public interface Listener { void onEdit(PantryItem item); void onChanged(); }
+
+    /**
+     * Interface definition for callbacks to edit or update pantry items.
+     */
+    public interface Listener {
+        void onEdit(PantryItem item);
+        void onChanged();
+    }
+
     private final List<PantryItem> items;
     private final DatabaseHelper db;
     private final Listener listener;
@@ -28,7 +40,8 @@ public class PantryAdapter extends RecyclerView.Adapter<PantryAdapter.Holder> {
         this.listener = listener;
     }
 
-    @NonNull @Override
+    @NonNull
+    @Override
     public Holder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         return new Holder(LayoutInflater.from(parent.getContext()).inflate(R.layout.row_pantry, parent, false));
     }
@@ -37,8 +50,13 @@ public class PantryAdapter extends RecyclerView.Adapter<PantryAdapter.Holder> {
     public void onBindViewHolder(@NonNull Holder h, int position) {
         PantryItem item = items.get(position);
         h.name.setText(item.name);
-        h.quantity.setText(item.quantity + " " + item.unit + (item.expiry == null || item.expiry.isEmpty() ? "" : " • Expires " + item.expiry));
 
+        // Display quantity, unit, and optional expiration date string
+        String quantityText = item.quantity + " " + item.unit + 
+                (item.expiry == null || item.expiry.isEmpty() ? "" : " • Expires " + item.expiry);
+        h.quantity.setText(quantityText);
+
+        // Check if user enabled expiration reminders in settings
         SharedPreferences prefs = h.itemView.getContext().getSharedPreferences("settings", Context.MODE_PRIVATE);
         boolean showReminder = prefs.getBoolean("expiry_reminder", true);
 
@@ -54,15 +72,32 @@ public class PantryAdapter extends RecyclerView.Adapter<PantryAdapter.Holder> {
             h.expiryReminder.setVisibility(View.GONE);
         }
 
+        // Edit button listener
         h.edit.setOnClickListener(v -> listener.onEdit(item));
-        h.delete.setOnClickListener(v -> new AlertDialog.Builder(v.getContext()).setTitle("Delete ingredient?")
+
+        // Delete button listener with confirmation dialog
+        h.delete.setOnClickListener(v -> new AlertDialog.Builder(v.getContext())
+                .setTitle("Delete ingredient?")
                 .setMessage("Remove " + item.name + " from your pantry?")
-                .setNegativeButton("Cancel", null).setPositiveButton("Delete", (d, w) -> { db.deletePantryItem(item.id); listener.onChanged(); }).show());
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Delete", (d, w) -> {
+                    db.deletePantryItem(item.id);
+                    listener.onChanged();
+                })
+                .show());
     }
 
     @Override
-    public int getItemCount() { return items.size(); }
+    public int getItemCount() {
+        return items.size();
+    }
 
+    /**
+     * Calculates remaining days until expiration and returns an appropriate warning label.
+     *
+     * @param expiryStr Expiration date formatted as YYYY-MM-DD
+     * @return Formatted reminder string or null if not expiring soon/invalid
+     */
     private String getExpiryReminderText(String expiryStr) {
         if (expiryStr == null || !expiryStr.matches("\\d{4}-\\d{2}-\\d{2}")) return null;
         try {
@@ -70,6 +105,7 @@ public class PantryAdapter extends RecyclerView.Adapter<PantryAdapter.Holder> {
             Date date = sdf.parse(expiryStr);
             if (date == null) return null;
 
+            // Zero out time components for date comparison
             Calendar today = Calendar.getInstance();
             today.set(Calendar.HOUR_OF_DAY, 0);
             today.set(Calendar.MINUTE, 0);
@@ -99,9 +135,13 @@ public class PantryAdapter extends RecyclerView.Adapter<PantryAdapter.Holder> {
         return null;
     }
 
+    /**
+     * ViewHolder for pantry item rows.
+     */
     static class Holder extends RecyclerView.ViewHolder {
         TextView name, quantity, expiryReminder;
         Button edit, delete;
+
         Holder(View v) {
             super(v);
             name = v.findViewById(R.id.txtName);
@@ -112,4 +152,3 @@ public class PantryAdapter extends RecyclerView.Adapter<PantryAdapter.Holder> {
         }
     }
 }
-

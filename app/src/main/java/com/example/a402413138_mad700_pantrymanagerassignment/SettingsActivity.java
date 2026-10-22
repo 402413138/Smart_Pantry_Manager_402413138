@@ -6,7 +6,12 @@ import android.widget.Switch;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
 
+/**
+ * Activity for configuring user preferences, including expiry notifications,
+ * dark mode theme toggling, and unit system display preferences.
+ */
 public class SettingsActivity extends AppCompatActivity {
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -14,12 +19,14 @@ public class SettingsActivity extends AppCompatActivity {
 
         SharedPreferences prefs = getSharedPreferences("settings", MODE_PRIVATE);
 
+        // Expiry reminder toggle
         Switch expiry = findViewById(R.id.switchExpiry);
         expiry.setChecked(prefs.getBoolean("expiry_reminder", true));
         expiry.setOnCheckedChangeListener((button, checked) ->
             prefs.edit().putBoolean("expiry_reminder", checked).apply()
         );
 
+        // Dark mode toggle
         Switch darkMode = findViewById(R.id.switchDarkMode);
         boolean isDarkMode = prefs.getBoolean("dark_mode", true);
         darkMode.setChecked(isDarkMode);
@@ -32,6 +39,7 @@ public class SettingsActivity extends AppCompatActivity {
             }
         });
 
+        // Unit system preference toggle (Metric vs Imperial hint)
         Switch unitSwitch = findViewById(R.id.switchUnitSystem);
         boolean useMetric = prefs.getBoolean("use_south_african_units", true);
         unitSwitch.setChecked(useMetric);

@@ -1,4 +1,3 @@
-
 package com.example.a402413138_mad700_pantrymanagerassignment;
 
 import android.os.Bundle;
@@ -11,6 +10,11 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import java.util.List;
 
+/**
+ * Activity presenting recipe suggestions categorized into:
+ * 1. Strict Matches (Recipes you can make right now with available ingredients).
+ * 2. Almost There Matches (Recipes missing only one ingredient requirement).
+ */
 public class SuggestedRecipesActivity extends AppCompatActivity {
 
     private DatabaseHelper db;
@@ -22,27 +26,20 @@ public class SuggestedRecipesActivity extends AppCompatActivity {
 
         db = new DatabaseHelper(this);
 
-        RecyclerView strictRecycler =
-                findViewById(R.id.recipeRecycler);
+        RecyclerView strictRecycler = findViewById(R.id.recipeRecycler);
+        RecyclerView almostRecycler = findViewById(R.id.almostThereRecycler);
 
-        RecyclerView almostRecycler =
-                findViewById(R.id.almostThereRecycler);
+        strictRecycler.setLayoutManager(new LinearLayoutManager(this));
+        almostRecycler.setLayoutManager(new LinearLayoutManager(this));
 
-        strictRecycler.setLayoutManager(
-                new LinearLayoutManager(this)
-        );
-
-        almostRecycler.setLayoutManager(
-                new LinearLayoutManager(this)
-        );
-
-        // These lists are inside a ScrollView.
+        // Disable nested scrolling on internal RecyclerViews since parent is inside a ScrollView
         strictRecycler.setNestedScrollingEnabled(false);
         almostRecycler.setNestedScrollingEnabled(false);
 
         TextView strictEmpty = findViewById(R.id.txtEmpty);
         TextView almostEmpty = findViewById(R.id.txtAlmostThereEmpty);
 
+        // Load recipes for both categories
         loadRecipes(
                 strictRecycler,
                 strictEmpty,
@@ -58,6 +55,9 @@ public class SuggestedRecipesActivity extends AppCompatActivity {
         );
     }
 
+    /**
+     * Binds recipe list to specified RecyclerView and handles empty view visibility.
+     */
     private void loadRecipes(
             RecyclerView recycler,
             TextView empty,
@@ -67,27 +67,25 @@ public class SuggestedRecipesActivity extends AppCompatActivity {
         recycler.setAdapter(new RecipeAdapter(recipes));
 
         empty.setText(emptyMessage);
-        empty.setVisibility(
-                recipes.isEmpty() ? View.VISIBLE : View.GONE
-        );
+        empty.setVisibility(recipes.isEmpty() ? View.VISIBLE : View.GONE);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
 
-        // Refresh suggestions when returning from another screen.
+        // Refresh suggestions when returning from another screen
         if (db != null) {
             refreshRecipes();
         }
     }
 
+    /**
+     * Re-queries database and updates both recipe lists.
+     */
     private void refreshRecipes() {
-        RecyclerView strictRecycler =
-                findViewById(R.id.recipeRecycler);
-
-        RecyclerView almostRecycler =
-                findViewById(R.id.almostThereRecycler);
+        RecyclerView strictRecycler = findViewById(R.id.recipeRecycler);
+        RecyclerView almostRecycler = findViewById(R.id.almostThereRecycler);
 
         TextView strictEmpty = findViewById(R.id.txtEmpty);
         TextView almostEmpty = findViewById(R.id.txtAlmostThereEmpty);

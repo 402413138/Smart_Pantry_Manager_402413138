@@ -1,4 +1,3 @@
-
 package com.example.a402413138_mad700_pantrymanagerassignment;
 
 import android.app.DatePickerDialog;
@@ -13,6 +12,10 @@ import androidx.appcompat.app.AppCompatActivity;
 import java.util.Calendar;
 import java.util.Locale;
 
+/**
+ * Form Activity for adding new pantry ingredients or editing existing ones.
+ * Provides validation for name, positive numerical quantity, unit string, and valid date formats.
+ */
 public class IngredientFormActivity extends AppCompatActivity {
 
     private DatabaseHelper db;
@@ -31,19 +34,19 @@ public class IngredientFormActivity extends AppCompatActivity {
         unit = findViewById(R.id.editUnit);
         expiry = findViewById(R.id.editExpiry);
 
+        // Adjust unit input field hint based on user unit preference setting
         android.content.SharedPreferences prefs = getSharedPreferences("settings", MODE_PRIVATE);
         boolean useMetric = prefs.getBoolean("use_south_african_units", true);
         unit.setHint(useMetric ? "Unit (e.g. g, ml, piece, kg)" : "Unit (e.g. oz, fl oz, cup, lb)");
 
         name.requestFocus();
 
-        // Open the date picker when the expiry field is tapped.
+        // Configure DatePickerDialog on tap for the expiry field
         expiry.setFocusable(false);
         expiry.setClickable(true);
-
         expiry.setOnClickListener(v -> showDatePicker());
 
-        // Load existing ingredient details when editing.
+        // Load existing ingredient details if editing an item
         if (getIntent().hasExtra("id")) {
             itemId = getIntent().getLongExtra("id", 0);
 
@@ -51,11 +54,7 @@ public class IngredientFormActivity extends AppCompatActivity {
             title.setText("Edit ingredient");
 
             name.setText(getIntent().getStringExtra("name"));
-
-            quantity.setText(String.valueOf(
-                    getIntent().getDoubleExtra("quantity", 0)
-            ));
-
+            quantity.setText(String.valueOf(getIntent().getDoubleExtra("quantity", 0)));
             unit.setText(getIntent().getStringExtra("unit"));
             expiry.setText(getIntent().getStringExtra("expiry"));
         }
@@ -64,17 +63,18 @@ public class IngredientFormActivity extends AppCompatActivity {
         saveButton.setOnClickListener(v -> save());
     }
 
+    /**
+     * Displays a DatePickerDialog for selecting the ingredient expiration date.
+     */
     private void showDatePicker() {
         Calendar calendar = Calendar.getInstance();
 
-        // Default to today's date.
         int year = calendar.get(Calendar.YEAR);
         int month = calendar.get(Calendar.MONTH);
         int day = calendar.get(Calendar.DAY_OF_MONTH);
 
-        // If a date is already selected, use it as the initial date.
+        // If a date is already filled, parse it to pre-select in the date picker
         String currentDate = expiry.getText().toString().trim();
-
         if (currentDate.matches("\\d{4}-\\d{2}-\\d{2}")) {
             try {
                 year = Integer.parseInt(currentDate.substring(0, 4));
@@ -84,12 +84,9 @@ public class IngredientFormActivity extends AppCompatActivity {
                 Calendar selectedDate = Calendar.getInstance();
                 selectedDate.setLenient(false);
                 selectedDate.set(year, month, day);
-
-                // Validate the existing date.
                 selectedDate.getTimeInMillis();
-
             } catch (IllegalArgumentException ex) {
-                // If the stored date is invalid, use today's date.
+                // Revert to current date if parsed date is invalid
                 calendar = Calendar.getInstance();
                 year = calendar.get(Calendar.YEAR);
                 month = calendar.get(Calendar.MONTH);
@@ -107,7 +104,6 @@ public class IngredientFormActivity extends AppCompatActivity {
                             selectedMonth + 1,
                             selectedDay
                     );
-
                     expiry.setText(expiryDate);
                     expiry.setError(null);
                 },
@@ -119,12 +115,16 @@ public class IngredientFormActivity extends AppCompatActivity {
         datePickerDialog.show();
     }
 
+    /**
+     * Validates input fields and saves the pantry item to SQLite.
+     */
     private void save() {
         String n = name.getText().toString().trim();
         String q = quantity.getText().toString().trim();
         String u = unit.getText().toString().trim();
         String e = expiry.getText().toString().trim();
 
+        // Field validations
         if (n.isEmpty()) {
             name.setError("Enter an ingredient name");
             return;
@@ -136,7 +136,6 @@ public class IngredientFormActivity extends AppCompatActivity {
         }
 
         double qty;
-
         try {
             qty = Double.parseDouble(q);
         } catch (NumberFormatException ex) {
@@ -160,7 +159,7 @@ public class IngredientFormActivity extends AppCompatActivity {
                 return;
             }
 
-            // Validate the actual calendar date, not just its format.
+            // Validate calendar date correctness (e.g. leap years, valid months)
             try {
                 Calendar validation = Calendar.getInstance();
                 validation.setLenient(false);
@@ -170,32 +169,21 @@ public class IngredientFormActivity extends AppCompatActivity {
                         Integer.parseInt(e.substring(8, 10))
                 );
                 validation.getTimeInMillis();
-
             } catch (IllegalArgumentException ex) {
                 expiry.setError("Select a valid expiry date");
                 return;
             }
         }
 
-        long result = db.savePantryItem(
-                new PantryItem(itemId, n, qty, u, e)
-        );
+        // Save to database
+        long result = db.savePantryItem(new PantryItem(itemId, n, qty, u, e));
 
         if (result < 0) {
-            Toast.makeText(
-                    this,
-                    "Could not save ingredient",
-                    Toast.LENGTH_LONG
-            ).show();
+            Toast.makeText(this, "Could not save ingredient", Toast.LENGTH_LONG).show();
             return;
         }
 
-        Toast.makeText(
-                this,
-                "Ingredient saved",
-                Toast.LENGTH_SHORT
-        ).show();
-
+        Toast.makeText(this, "Ingredient saved", Toast.LENGTH_SHORT).show();
         finish();
     }
 }
