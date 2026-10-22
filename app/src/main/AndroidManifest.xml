@@ -1,9 +1,15 @@
-
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
+        android:name=".SmartPantryApp"
         android:allowBackup="true"
         android:label="Smart Pantry Manager"
-        android:supportsRtl="true">
+        android:theme="@style/Theme.SmartPantry"
+        android:supportsRtl="true"
+        android:icon="@mipmap/pantry_manager"
+        android:roundIcon="@mipmap/pantry_manager">
+        <activity android:name=".SettingsActivity" />
+        <activity android:name=".RecipeDetailActivity" />
+        <activity android:name=".SuggestedRecipesActivity" />
         <activity android:name=".IngredientFormActivity" />
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
