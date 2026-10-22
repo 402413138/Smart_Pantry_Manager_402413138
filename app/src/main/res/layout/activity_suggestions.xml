@@ -48,5 +48,34 @@
             android:layout_marginBottom="16dp"
             android:background="#BDBDBD" />
 
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Almost There"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:paddingBottom="8dp"
+            android:background="@drawable/title_bg_box"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Recipes missing only one ingredient or quantity."
+            android:paddingBottom="8dp" />
+
+        <TextView
+            android:id="@+id/txtAlmostThereEmpty"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="No recipes are missing exactly one ingredient right now."
+            android:visibility="gone"
+            android:padding="8dp" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/almostThereRecycler"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/list_bg_box"/>
+
     </LinearLayout>
 </ScrollView>
